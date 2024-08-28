@@ -1,475 +1,1011 @@
-This README is just a fast *quick start* document. You can find more detailed documentation at [redis.io](https://redis.io).
+# :book: 0x05. 0x03. Queuing System in JS.
+## :page_with_curl: Topics Covered.
+This project involves how to use Redis and implementing Kue as a queue system. The learning objectives include;
+1. Running a Redis server.
+2. Using a Redis client for basic operations and with Node JS.
+3. Storing hash values in Redis.
+4. Dealing with async operations.
+5. Building a basic Express app interacting with a Redis server.
+6. Building a basic Express app interacting with a Redis server and queue.
 
-What is Redis?
---------------
+# :computer: Tasks.
+<!---->
+## [0. Install a redis instance](1-redis_op.js)
+### :page_with_curl: Task requirements.
+Download, extract, and compile the latest stable Redis version (higher than 5.0.7 - [https://redis.io/download/](/rltoken/v6VB9ZwmVfppL0OmzbmVWQ "https://redis.io/download/")):
+```
+    $ wget http://download.redis.io/releases/redis-6.0.10.tar.gz
+    $ tar xzf redis-6.0.10.tar.gz
+    $ cd redis-6.0.10
+    $ make
+```
 
-Redis is often referred to as a *data structures* server. What this means is that Redis provides access to mutable data structures via a set of commands, which are sent using a *server-client* model with TCP sockets and a simple protocol. So different processes can query and modify the same data structures in a shared way.
+* Start Redis in the background with `src/redis-server`
+```
+    $ src/redis-server &
+```
 
-Data structures implemented into Redis have a few special properties:
-
-* Redis cares to store them on disk, even if they are always served and modified into the server memory. This means that Redis is fast, but that it is also non-volatile.
-* The implementation of data structures emphasizes memory efficiency, so data structures inside Redis will likely use less memory compared to the same data structure modelled using a high-level programming language.
-* Redis offers a number of features that are natural to find in a database, like replication, tunable levels of durability, clustering, and high availability.
-
-Another good example is to think of Redis as a more complex version of memcached, where the operations are not just SETs and GETs, but operations that work with complex data types like Lists, Sets, ordered data structures, and so forth.
-
-If you want to know more, this is a list of selected starting points:
-
-* Introduction to Redis data types. http://redis.io/topics/data-types-intro
-* Try Redis directly inside your browser. http://try.redis.io
-* The full list of Redis commands. http://redis.io/commands
-* There is much more inside the official Redis documentation. http://redis.io/documentation
-
-Building Redis
---------------
-
-Redis can be compiled and used on Linux, OSX, OpenBSD, NetBSD, FreeBSD.
-We support big endian and little endian architectures, and both 32 bit
-and 64 bit systems.
-
-It may compile on Solaris derived systems (for instance SmartOS) but our
-support for this platform is *best effort* and Redis is not guaranteed to
-work as well as in Linux, OSX, and \*BSD.
-
-It is as simple as:
-
-    % make
-
-To build with TLS support, you'll need OpenSSL development libraries (e.g.
-libssl-dev on Debian/Ubuntu) and run:
-
-    % make BUILD_TLS=yes
-
-To build with systemd support, you'll need systemd development libraries (such 
-as libsystemd-dev on Debian/Ubuntu or systemd-devel on CentOS) and run:
-
-    % make USE_SYSTEMD=yes
-
-To append a suffix to Redis program names, use:
-
-    % make PROG_SUFFIX="-alt"
-
-You can run a 32 bit Redis binary using:
-
-    % make 32bit
-
-After building Redis, it is a good idea to test it using:
-
-    % make test
-
-If TLS is built, running the tests with TLS enabled (you will need `tcl-tls`
-installed):
-
-    % ./utils/gen-test-certs.sh
-    % ./runtest --tls
-
-
-Fixing build problems with dependencies or cached build options
----------
-
-Redis has some dependencies which are included in the `deps` directory.
-`make` does not automatically rebuild dependencies even if something in
-the source code of dependencies changes.
-
-When you update the source code with `git pull` or when code inside the
-dependencies tree is modified in any other way, make sure to use the following
-command in order to really clean everything and rebuild from scratch:
-
-    make distclean
-
-This will clean: jemalloc, lua, hiredis, linenoise.
-
-Also if you force certain build options like 32bit target, no C compiler
-optimizations (for debugging purposes), and other similar build time options,
-those options are cached indefinitely until you issue a `make distclean`
-command.
-
-Fixing problems building 32 bit binaries
----------
-
-If after building Redis with a 32 bit target you need to rebuild it
-with a 64 bit target, or the other way around, you need to perform a
-`make distclean` in the root directory of the Redis distribution.
-
-In case of build errors when trying to build a 32 bit binary of Redis, try
-the following steps:
-
-* Install the package libc6-dev-i386 (also try g++-multilib).
-* Try using the following command line instead of `make 32bit`:
-  `make CFLAGS="-m32 -march=native" LDFLAGS="-m32"`
-
-Allocator
----------
-
-Selecting a non-default memory allocator when building Redis is done by setting
-the `MALLOC` environment variable. Redis is compiled and linked against libc
-malloc by default, with the exception of jemalloc being the default on Linux
-systems. This default was picked because jemalloc has proven to have fewer
-fragmentation problems than libc malloc.
-
-To force compiling against libc malloc, use:
-
-    % make MALLOC=libc
-
-To compile against jemalloc on Mac OS X systems, use:
-
-    % make MALLOC=jemalloc
-
-Verbose build
--------------
-
-Redis will build with a user-friendly colorized output by default.
-If you want to see a more verbose output, use the following:
-
-    % make V=1
-
-Running Redis
--------------
-
-To run Redis with the default configuration, just type:
-
-    % cd src
-    % ./redis-server
-
-If you want to provide your redis.conf, you have to run it using an additional
-parameter (the path of the configuration file):
-
-    % cd src
-    % ./redis-server /path/to/redis.conf
-
-It is possible to alter the Redis configuration by passing parameters directly
-as options using the command line. Examples:
-
-    % ./redis-server --port 9999 --replicaof 127.0.0.1 6379
-    % ./redis-server /etc/redis/6379.conf --loglevel debug
-
-All the options in redis.conf are also supported as options using the command
-line, with exactly the same name.
-
-Running Redis with TLS:
-------------------
-
-Please consult the [TLS.md](TLS.md) file for more information on
-how to use Redis with TLS.
-
-Playing with Redis
-------------------
-
-You can use redis-cli to play with Redis. Start a redis-server instance,
-then in another terminal try the following:
-
-    % cd src
-    % ./redis-cli
-    redis> ping
+* Make sure that the server is working with a ping `src/redis-cli ping`
+```
     PONG
-    redis> set foo bar
+```
+
+* Using the Redis client again, set the value `School` for the key `Holberton`
+```
+    127.0.0.1:[Port]> set Holberton School
     OK
-    redis> get foo
-    "bar"
-    redis> incr mycounter
-    (integer) 1
-    redis> incr mycounter
-    (integer) 2
-    redis>
+    127.0.0.1:[Port]> get Holberton
+    "School"
+```
 
-You can find the list of all the available commands at http://redis.io/commands.
+* Kill the server with the process id of the redis-server (hint: use `ps` and `grep`)
+```
+    $ kill [PID_OF_Redis_Server]
+```
 
-Installing Redis
------------------
+Copy the `dump.rdb` from the `redis-5.0.7` directory into the root of the Queuing project.
 
-In order to install Redis binaries into /usr/local/bin, just use:
+Requirements:
 
-    % make install
+* Running `get Holberton` in the client, should return `School`
 
-You can use `make PREFIX=/some/other/directory install` if you wish to use a
-different destination.
+**Repo:**
 
-Make install will just install binaries in your system, but will not configure
-init scripts and configuration files in the appropriate place. This is not
-needed if you just want to play a bit with Redis, but if you are installing
-it the proper way for a production system, we have a script that does this
-for Ubuntu and Debian systems:
+* GitHub repository: `alx-backend`
+* Directory: `0x03-queuing_system_in_js`
+* File: `README.md, dump.rdb`
 
-    % cd utils
-    % ./install_server.sh
+### :wrench: Task setup.
+```bash
+wget http://download.redis.io/releases/redis-6.0.10.tar.gz
+tar xzf redis-6.0.10.tar.gz
+cd redis-6.0.10
+make
 
-_Note_: `install_server.sh` will not work on Mac OSX; it is built for Linux only.
+# Start Redis.
+cd /root/redis-6.0.10
+src/redis-server &
 
-The script will ask you a few questions and will setup everything you need
-to run Redis properly as a background daemon that will start again on
-system reboots.
+# ping redis server.
+src/redis-cli ping
 
-You'll be able to stop and start Redis using the script named
-`/etc/init.d/redis_<portnumber>`, for instance `/etc/init.d/redis_6379`.
+# Enter Redis client.
+redis-cli
 
-Code contributions
------------------
+# Kill redis server
+redis-cli shutdown # or using process id
 
-Note: By contributing code to the Redis project in any form, including sending
-a pull request via Github, a code fragment or patch via private email or
-public discussion groups, you agree to release your code under the terms
-of the BSD license that you can find in the [COPYING][1] file included in the Redis
-source distribution.
+ps aux | grep redis-server
+kill <PID>
+```
 
-Please see the [CONTRIBUTING][2] file in this source distribution for more
-information.
+### :heavy_check_mark: Solution
+> [:point_right: README.md](README.md), [dump.rdb](dump.rdb)
+<!---->
 
-[1]: https://github.com/redis/redis/blob/unstable/COPYING
-[2]: https://github.com/redis/redis/blob/unstable/CONTRIBUTING
+<!---->
+## [1. Node Redis Client](0-redis_client.js)
+### :page_with_curl: Task requirements.
+Install [node_redis](/rltoken/mRftfl67BrNvl-RM5JQfUA "node_redis") using npm
 
-Redis internals
-===
+Using Babel and ES6, write a script named `0-redis_client.js`. It should connect to the Redis server running on your machine:
 
-If you are reading this README you are likely in front of a Github page
-or you just untarred the Redis distribution tar ball. In both the cases
-you are basically one step away from the source code, so here we explain
-the Redis source code layout, what is in each file as a general idea, the
-most important functions and structures inside the Redis server and so forth.
-We keep all the discussion at a high level without digging into the details
-since this document would be huge otherwise and our code base changes
-continuously, but a general idea should be a good starting point to
-understand more. Moreover most of the code is heavily commented and easy
-to follow.
+* It should log to the console the message `Redis client connected to the server` when the connection to Redis works correctly
+* It should log to the console the message `Redis client not connected to the server: ERROR_MESSAGE` when the connection to Redis does not work
 
-Source code layout
----
+**Requirements:**
 
-The Redis root directory just contains this README, the Makefile which
-calls the real Makefile inside the `src` directory and an example
-configuration for Redis and Sentinel. You can find a few shell
-scripts that are used in order to execute the Redis, Redis Cluster and
-Redis Sentinel unit tests, which are implemented inside the `tests`
-directory.
+* To import the library, you need to use the keyword `import`
+```
+    bob@dylan:~$ ps ax | grep redis-server
+     2070 pts/1    S+     0:00 grep --color=auto redis-server
+    bob@dylan:~$ 
+    bob@dylan:~$ npm run dev 0-redis_client.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "0-redis_client.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 0-redis_client.js`
+    Redis client not connected to the server: Error: Redis connection to 127.0.0.1:6379 failed - connect ECONNREFUSED 127.0.0.1:6379
+    Redis client not connected to the server: Error: Redis connection to 127.0.0.1:6379 failed - connect ECONNREFUSED 127.0.0.1:6379
+    Redis client not connected to the server: Error: Redis connection to 127.0.0.1:6379 failed - connect ECONNREFUSED 127.0.0.1:6379
+    ^C
+    bob@dylan:~$ 
+    bob@dylan:~$ ./src/redis-server > /dev/null 2>&1 &
+    [1] 2073
+    bob@dylan:~$ ps ax | grep redis-server
+     2073 pts/0    Sl     0:00 ./src/redis-server *:6379
+     2078 pts/1    S+     0:00 grep --color=auto redis-server
+    bob@dylan:~$
+    bob@dylan:~$ npm run dev 0-redis_client.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "0-redis_client.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 0-redis_client.js`
+    Redis client connected to the server
+    ^C
+    bob@dylan:~$
+```
 
-Inside the root are the following important directories:
+**Repo:**
 
-* `src`: contains the Redis implementation, written in C.
-* `tests`: contains the unit tests, implemented in Tcl.
-* `deps`: contains libraries Redis uses. Everything needed to compile Redis is inside this directory; your system just needs to provide `libc`, a POSIX compatible interface and a C compiler. Notably `deps` contains a copy of `jemalloc`, which is the default allocator of Redis under Linux. Note that under `deps` there are also things which started with the Redis project, but for which the main repository is not `redis/redis`.
+* GitHub repository: `alx-backend`
+* Directory: `0x03-queuing_system_in_js`
+* File: `0-redis_client.js`
 
-There are a few more directories but they are not very important for our goals
-here. We'll focus mostly on `src`, where the Redis implementation is contained,
-exploring what there is inside each file. The order in which files are
-exposed is the logical one to follow in order to disclose different layers
-of complexity incrementally.
 
-Note: lately Redis was refactored quite a bit. Function names and file
-names have been changed, so you may find that this documentation reflects the
-`unstable` branch more closely. For instance, in Redis 3.0 the `server.c`
-and `server.h` files were named `redis.c` and `redis.h`. However the overall
-structure is the same. Keep in mind that all the new developments and pull
-requests should be performed against the `unstable` branch.
+### :wrench: Task setup.
+```bash
+# Create solution file.
+touch 0-redis_client.js
+chmod +x 0-redis_client.js
 
-server.h
----
+# Lint.
+npm run lint 0-redis_client.js --fix
 
-The simplest way to understand how a program works is to understand the
-data structures it uses. So we'll start from the main header file of
-Redis, which is `server.h`.
+# Test.
+npm run dev 0-redis_client.js
+```
 
-All the server configuration and in general all the shared state is
-defined in a global structure called `server`, of type `struct redisServer`.
-A few important fields in this structure are:
+### :heavy_check_mark: Solution
+> [:point_right: 0-redis_client.js](0-redis_client.js)
+<!---->
 
-* `server.db` is an array of Redis databases, where data is stored.
-* `server.commands` is the command table.
-* `server.clients` is a linked list of clients connected to the server.
-* `server.master` is a special client, the master, if the instance is a replica.
+## [2. Node Redis client and basic operations](1-redis_op.js)
+### :page_with_curl: Task requirements.
+In a file `1-redis_op.js`, copy the code you previously wrote (`0-redis_client.js`).
 
-There are tons of other fields. Most fields are commented directly inside
-the structure definition.
+Add two functions:
 
-Another important Redis data structure is the one defining a client.
-In the past it was called `redisClient`, now just `client`. The structure
-has many fields, here we'll just show the main ones:
+* `setNewSchool`:
+    * It accepts two arguments `schoolName`, and `value`.
+    * It should set in Redis the value for the key `schoolName`
+    * It should display a confirmation message using `redis.print`
+* `displaySchoolValue`:
+    * It accepts one argument `schoolName`.
+    * It should log to the console the value for the key passed as argument
 
-    struct client {
-        int fd;
-        sds querybuf;
-        int argc;
-        robj **argv;
-        redisDb *db;
-        int flags;
-        list *reply;
-        char buf[PROTO_REPLY_CHUNK_BYTES];
-        ... many other fields ...
+At the end of the file, call:
+
+* `displaySchoolValue('Holberton');`
+* `setNewSchool('HolbertonSanFrancisco', '100');`
+* `displaySchoolValue('HolbertonSanFrancisco');`
+
+**Requirements:**
+
+* Use callbacks for any of the operation, we will look at async operations later
+```
+    bob@dylan:~$ npm run dev 1-redis_op.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "1-redis_op.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 1-redis_op.js`
+    Redis client connected to the server
+    School
+    Reply: OK
+    100
+    ^C
+    
+    bob@dylan:~$
+```
+
+**Repo:**
+
+* GitHub repository: `alx-backend`
+* Directory: `0x03-queuing_system_in_js`
+* File: `1-redis_op.js`
+
+
+### :wrench: Task setup.
+```bash
+# Create solution file.
+touch 1-redis_op.js
+chmod +x 1-redis_op.js
+
+# Lint.
+npm run lint 1-redis_op.js --fix
+
+# Test.
+npm run dev 1-redis_op.js
+```
+
+### :heavy_check_mark: Solution
+> [:point_right: 1-redis_op.js](1-redis_op.js)
+
+
+## [3. Node Redis client and async operations](2-redis_op_async.js)
+### :page_with_curl: Task requirements.
+In a file `1-redis_op.js`, copy the code you previously wrote (`0-redis_client.js`).
+
+Add two functions:
+
+* `setNewSchool`:
+    * It accepts two arguments `schoolName`, and `value`.
+    * It should set in Redis the value for the key `schoolName`
+    * It should display a confirmation message using `redis.print`
+* `displaySchoolValue`:
+    * It accepts one argument `schoolName`.
+    * It should log to the console the value for the key passed as argument
+
+At the end of the file, call:
+
+* `displaySchoolValue('Holberton');`
+* `setNewSchool('HolbertonSanFrancisco', '100');`
+* `displaySchoolValue('HolbertonSanFrancisco');`
+
+**Requirements:**
+
+* Use callbacks for any of the operation, we will look at async operations later
+```
+    bob@dylan:~$ npm run dev 1-redis_op.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "1-redis_op.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 1-redis_op.js`
+    Redis client connected to the server
+    School
+    Reply: OK
+    100
+    ^C
+    
+    bob@dylan:~$
+```
+
+**Repo:**
+
+* GitHub repository: `alx-backend`
+* Directory: `0x03-queuing_system_in_js`
+* File: `1-redis_op.js`
+
+### :wrench: Task setup.
+```bash
+# Create solution file.
+touch 2-redis_op_async.js
+chmod +x 2-redis_op_async.js
+
+# Lint.
+npm run lint 2-redis_op_async.js --fix
+
+# Test.
+npm run dev 2-redis_op_async.js
+```
+
+### :heavy_check_mark: Solution
+> [:point_right: 2-redis_op_async.js](2-redis_op_async.js)
+
+
+## [4. Node Redis client and advanced operations](4-redis_advanced_op.js)
+### :page_with_curl: Task requirements.
+In a file named `4-redis_advanced_op.js`, let’s use the client to store a hash value
+
+#### Create Hash:
+
+Using `hset`, let’s store the following:
+
+* The key of the hash should be `HolbertonSchools`
+* It should have a value for:
+    * `Portland=50`
+    * `Seattle=80`
+    * `New York=20`
+    * `Bogota=20`
+    * `Cali=40`
+    * `Paris=2`
+* Make sure you use `redis.print` for each `hset`
+
+#### Display Hash:
+
+Using `hgetall`, display the object stored in Redis. It should return the following:
+
+**Requirements:**
+
+* Use callbacks for any of the operation, we will look at async operations later
+```
+    bob@dylan:~$ npm run dev 4-redis_advanced_op.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "4-redis_advanced_op.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 4-redis_advanced_op.js`
+    Redis client connected to the server
+    Reply: 1
+    Reply: 1
+    Reply: 1
+    Reply: 1
+    Reply: 1
+    Reply: 1
+    {
+      Portland: '50',
+      Seattle: '80',
+      'New York': '20',
+      Bogota: '20',
+      Cali: '40',
+      Paris: '2'
     }
+    ^C
+    bob@dylan:~$
+```
 
-The client structure defines a *connected client*:
+**Repo:**
 
-* The `fd` field is the client socket file descriptor.
-* `argc` and `argv` are populated with the command the client is executing, so that functions implementing a given Redis command can read the arguments.
-* `querybuf` accumulates the requests from the client, which are parsed by the Redis server according to the Redis protocol and executed by calling the implementations of the commands the client is executing.
-* `reply` and `buf` are dynamic and static buffers that accumulate the replies the server sends to the client. These buffers are incrementally written to the socket as soon as the file descriptor is writeable.
+* GitHub repository: `alx-backend`
+* Directory: `0x03-queuing_system_in_js`
+* File: `4-redis_advanced_op.js`
 
-As you can see in the client structure above, arguments in a command
-are described as `robj` structures. The following is the full `robj`
-structure, which defines a *Redis object*:
 
-    typedef struct redisObject {
-        unsigned type:4;
-        unsigned encoding:4;
-        unsigned lru:LRU_BITS; /* lru time (relative to server.lruclock) */
-        int refcount;
-        void *ptr;
-    } robj;
+### :wrench: Task setup.
+```bash
+# Create solution file.
+touch 4-redis_advanced_op.js
+chmod +x 4-redis_advanced_op.js
 
-Basically this structure can represent all the basic Redis data types like
-strings, lists, sets, sorted sets and so forth. The interesting thing is that
-it has a `type` field, so that it is possible to know what type a given
-object has, and a `refcount`, so that the same object can be referenced
-in multiple places without allocating it multiple times. Finally the `ptr`
-field points to the actual representation of the object, which might vary
-even for the same type, depending on the `encoding` used.
+# Lint.
+npm run lint 4-redis_advanced_op.js --fix
 
-Redis objects are used extensively in the Redis internals, however in order
-to avoid the overhead of indirect accesses, recently in many places
-we just use plain dynamic strings not wrapped inside a Redis object.
+# Test.
+npm run dev 4-redis_advanced_op.js
+```
 
-server.c
----
+### :heavy_check_mark: Solution
+> [:point_right: api/v1/auth/auth.py](api/v1/app.py)
 
-This is the entry point of the Redis server, where the `main()` function
-is defined. The following are the most important steps in order to startup
-the Redis server.
+## [5. Node Redis client publisher and subscriber](5-subscriber.js)
+### :page_with_curl: Task requirements.
+In a file named `5-subscriber.js`, create a redis client:
 
-* `initServerConfig()` sets up the default values of the `server` structure.
-* `initServer()` allocates the data structures needed to operate, setup the listening socket, and so forth.
-* `aeMain()` starts the event loop which listens for new connections.
+* On connect, it should log the message `Redis client connected to the server`
+* On error, it should log the message `Redis client not connected to the server: ERROR MESSAGE`
+* It should subscribe to the channel `holberton school channel`
+* When it receives message on the channel `holberton school channel`, it should log the message to the console
+* When the message is `KILL_SERVER`, it should unsubscribe and quit
 
-There are two special functions called periodically by the event loop:
+In a file named `5-publisher.js`, create a redis client:
 
-1. `serverCron()` is called periodically (according to `server.hz` frequency), and performs tasks that must be performed from time to time, like checking for timed out clients.
-2. `beforeSleep()` is called every time the event loop fired, Redis served a few requests, and is returning back into the event loop.
+* On connect, it should log the message `Redis client connected to the server`
+* On error, it should log the message `Redis client not connected to the server: ERROR MESSAGE`
+* Write a function named `publishMessage`:
+    * It will take two arguments: `message` (string), and `time` (integer - in ms)
+    * After `time` millisecond:
+        * The function should log to the console `About to send MESSAGE`
+        * The function should publish to the channel `holberton school channel`, the message passed in argument after the time passed in arguments
+* At the end of the file, call:
+```
+    publishMessage("Holberton Student #1 starts course", 100);
+    publishMessage("Holberton Student #2 starts course", 200);
+    publishMessage("KILL_SERVER", 300);
+    publishMessage("Holberton Student #3 starts course", 400);
+```
 
-Inside server.c you can find code that handles other vital things of the Redis server:
+**Requirements:**
 
-* `call()` is used in order to call a given command in the context of a given client.
-* `activeExpireCycle()` handles eviciton of keys with a time to live set via the `EXPIRE` command.
-* `freeMemoryIfNeeded()` is called when a new write command should be performed but Redis is out of memory according to the `maxmemory` directive.
-* The global variable `redisCommandTable` defines all the Redis commands, specifying the name of the command, the function implementing the command, the number of arguments required, and other properties of each command.
+* You only need one Redis server to execute the program
+* You will need to have two node processes to run each script at the same time
 
-networking.c
----
+**Terminal 1:**
+```
+    bob@dylan:~$ npm run dev 5-subscriber.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "5-subscriber.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 5-subscriber.js`
+    Redis client connected to the server
+```
+**Terminal 2:**
+```
+    bob@dylan:~$ npm run dev 5-publisher.js 
+    
+    > queuing_system_in_js@1.0.0 dev /root
+    > nodemon --exec babel-node --presets @babel/preset-env "5-publisher.js"
+    
+    [nodemon] 2.0.4
+    [nodemon] to restart at any time, enter `rs`
+    [nodemon] watching path(s): *.*
+    [nodemon] watching extensions: js,mjs,json
+    [nodemon] starting `babel-node --presets @babel/preset-env 5-publisher.js`
+    Redis client connected to the server
+    About to send Holberton Student #1 starts course
+    About to send Holberton Student #2 starts course
+    About to send KILL_SERVER
+    About to send Holberton Student #3 starts course
+    ^C
+    bob@dylan:~$ 
+```
 
-This file defines all the I/O functions with clients, masters and replicas
-(which in Redis are just special clients):
+**And in the same time in Terminal 1:**
+```
+    Redis client connected to the server
+    Holberton Student #1 starts course
+    Holberton Student #2 starts course
+    KILL_SERVER
+    [nodemon] clean exit - waiting for changes before restart
+    ^C
+    bob@dylan:~$ 
+```
 
-* `createClient()` allocates and initializes a new client.
-* the `addReply*()` family of functions are used by command implementations in order to append data to the client structure, that will be transmitted to the client as a reply for a given command executed.
-* `writeToClient()` transmits the data pending in the output buffers to the client and is called by the *writable event handler* `sendReplyToClient()`.
-* `readQueryFromClient()` is the *readable event handler* and accumulates data read from the client into the query buffer.
-* `processInputBuffer()` is the entry point in order to parse the client query buffer according to the Redis protocol. Once commands are ready to be processed, it calls `processCommand()` which is defined inside `server.c` in order to actually execute the command.
-* `freeClient()` deallocates, disconnects and removes a client.
+Now you have a basic Redis-based queuing system where you have a process to generate job and a second one to process it. These 2 processes can be in 2 different servers, which we also call “background workers”.
 
-aof.c and rdb.c
----
+**Repo:**
 
-As you can guess from the names, these files implement the RDB and AOF
-persistence for Redis. Redis uses a persistence model based on the `fork()`
-system call in order to create a thread with the same (shared) memory
-content of the main Redis thread. This secondary thread dumps the content
-of the memory on disk. This is used by `rdb.c` to create the snapshots
-on disk and by `aof.c` in order to perform the AOF rewrite when the
-append only file gets too big.
+* GitHub repository: `alx-backend`
+* Directory: `0x03-queuing_system_in_js`
+* File: `5-subscriber.js, 5-publisher.js`
 
-The implementation inside `aof.c` has additional functions in order to
-implement an API that allows commands to append new commands into the AOF
-file as clients execute them.
+### :wrench: Task setup.
+```bash
+# Create solution file.
+touch 5-subscriber.js 5-publisher.js
+chmod +x 5-subscriber.js 5-publisher.js
 
-The `call()` function defined inside `server.c` is responsible for calling
-the functions that in turn will write the commands into the AOF.
+# Lint.
+npm run lint 5-subscriber.js
+npm run lint 5-publisher.js
 
-db.c
----
+# Test.
+npm run dev 5-subscriber.js
+npm run dev 5-publisher.js 
+```
 
-Certain Redis commands operate on specific data types; others are general.
-Examples of generic commands are `DEL` and `EXPIRE`. They operate on keys
-and not on their values specifically. All those generic commands are
-defined inside `db.c`.
+### :heavy_check_mark: Solution
+> [:point_right: 5-subscriber.js](5-subscriber.js), [:point_right: 5-publisher.js](5-publisher.js)
 
-Moreover `db.c` implements an API in order to perform certain operations
-on the Redis dataset without directly accessing the internal data structures.
+<!---->
+## [6. Use Session ID for identifying a User](api/v1/app.py)
+### :page_with_curl: Task requirements.
+Score: 0.0% (Checks completed: 0.0%)
 
-The most important functions inside `db.c` which are used in many command
-implementations are the following:
+Update `SessionAuth` class:
 
-* `lookupKeyRead()` and `lookupKeyWrite()` are used in order to get a pointer to the value associated to a given key, or `NULL` if the key does not exist.
-* `dbAdd()` and its higher level counterpart `setKey()` create a new key in a Redis database.
-* `dbDelete()` removes a key and its associated value.
-* `emptyDb()` removes an entire single database or all the databases defined.
+Create an instance method `def current_user(self, request=None):` (overload) that returns a `User` instance based on a cookie value:
 
-The rest of the file implements the generic commands exposed to the client.
+* You must use `self.session_cookie(...)` and `self.user_id_for_session_id(...)` to return the User ID based on the cookie `_my_session_id`
+* By using this User ID, you will be able to retrieve a `User` instance from the database - you can use `User.get(...)` for retrieving a `User` from the database.
 
-object.c
----
+Now, you will be able to get a User based on his session ID.
 
-The `robj` structure defining Redis objects was already described. Inside
-`object.c` there are all the functions that operate with Redis objects at
-a basic level, like functions to allocate new objects, handle the reference
-counting and so forth. Notable functions inside this file:
+In the first terminal:
+```
+    bob@dylan:~$ cat main_4.py
+    #!/usr/bin/env python3
+    """ Main 4
+    """
+    from flask import Flask, request
+    from api.v1.auth.session_auth import SessionAuth
+    from models.user import User
+    
+    """ Create a user test """
+    user_email = "bobsession@hbtn.io"
+    user_clear_pwd = "fake pwd"
+    
+    user = User()
+    user.email = user_email
+    user.password = user_clear_pwd
+    user.save()
+    
+    """ Create a session ID """
+    sa = SessionAuth()
+    session_id = sa.create_session(user.id)
+    print("User with ID: {} has a Session ID: {}".format(user.id, session_id))
+    
+    """ Create a Flask app """
+    app = Flask(__name__)
+    
+    @app.route('/', methods=['GET'], strict_slashes=False)
+    def root_path():
+        """ Root path
+        """
+        request_user = sa.current_user(request)
+        if request_user is None:
+            return "No user found\n"
+        return "User found: {}\n".format(request_user.id)
+    
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port="5000")
+    
+    bob@dylan:~$
+    bob@dylan:~$ API_HOST=0.0.0.0 API_PORT=5000 AUTH_TYPE=session_auth SESSION_NAME=_my_session_id ./main_4.py
+    User with ID: cf3ddee1-ff24-49e4-a40b-2540333fe992 has a Session ID: 9d1648aa-da79-4692-8236-5f9d7f9e9485
+     * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+    ....
+```
 
-* `incrRefCount()` and `decrRefCount()` are used in order to increment or decrement an object reference count. When it drops to 0 the object is finally freed.
-* `createObject()` allocates a new object. There are also specialized functions to allocate string objects having a specific content, like `createStringObjectFromLongLong()` and similar functions.
+In a second terminal:
+```
+    bob@dylan:~$ curl "http://0.0.0.0:5000/"
+    No user found
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/" --cookie "_my_session_id=Holberton"
+    No user found
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/" --cookie "_my_session_id=9d1648aa-da79-4692-8236-5f9d7f9e9485"
+    User found: cf3ddee1-ff24-49e4-a40b-2540333fe992
+    bob@dylan:~$
+```
 
-This file also implements the `OBJECT` command.
+### :wrench: Task setup.
+```bash
+```
 
-replication.c
----
+### :heavy_check_mark: Solution
+> [:point_right: api/v1/auth/session_auth.py](api/v1/auth/session_auth.py)
+<!---->
 
-This is one of the most complex files inside Redis, it is recommended to
-approach it only after getting a bit familiar with the rest of the code base.
-In this file there is the implementation of both the master and replica role
-of Redis.
 
-One of the most important functions inside this file is `replicationFeedSlaves()` that writes commands to the clients representing replica instances connected
-to our master, so that the replicas can get the writes performed by the clients:
-this way their data set will remain synchronized with the one in the master.
+<!---->
+## [7. New view for Session Authentication](api/v1/views/session_auth.py)
+### :page_with_curl: Task requirements.
+Score: 0.0% (Checks completed: 0.0%)
 
-This file also implements both the `SYNC` and `PSYNC` commands that are
-used in order to perform the first synchronization between masters and
-replicas, or to continue the replication after a disconnection.
+Create a new Flask view that handles all routes for the Session authentication.
 
-Other C files
----
+In the file `api/v1/views/session_auth.py`, create a route `POST /auth_session/login` (= `POST /api/v1/auth_session/login`):
 
-* `t_hash.c`, `t_list.c`, `t_set.c`, `t_string.c`, `t_zset.c` and `t_stream.c` contains the implementation of the Redis data types. They implement both an API to access a given data type, and the client command implementations for these data types.
-* `ae.c` implements the Redis event loop, it's a self contained library which is simple to read and understand.
-* `sds.c` is the Redis string library, check http://github.com/antirez/sds for more information.
-* `anet.c` is a library to use POSIX networking in a simpler way compared to the raw interface exposed by the kernel.
-* `dict.c` is an implementation of a non-blocking hash table which rehashes incrementally.
-* `scripting.c` implements Lua scripting. It is completely self-contained and isolated from the rest of the Redis implementation and is simple enough to understand if you are familiar with the Lua API.
-* `cluster.c` implements the Redis Cluster. Probably a good read only after being very familiar with the rest of the Redis code base. If you want to read `cluster.c` make sure to read the [Redis Cluster specification][3].
+* Slash tolerant (`/auth_session/login` == `/auth_session/login/`)
+* You must use `request.form.get()` to retrieve `email` and `password` parameters
+* If `email` is missing or empty, return the JSON `{ "error": "email missing" }` with the status code `400`
+* If `password` is missing or empty, return the JSON `{ "error": "password missing" }` with the status code `400`
+* Retrieve the `User` instance based on the `email` \- you must use the class method `search` of `User` (same as the one used for the `BasicAuth`)
+    * If no `User` found, return the JSON `{ "error": "no user found for this email" }` with the status code `404`
+    * If the `password` is not the one of the `User` found, return the JSON `{ "error": "wrong password" }` with the status code `401` \- you must use `is_valid_password` from the `User` instance
+    * Otherwise, create a Session ID for the `User` ID:
+        * You must use `from api.v1.app import auth` \- **WARNING: please import it only where you need it** \- not on top of the file (can generate circular import - and break first tasks of this project)
+        * You must use `auth.create_session(..)` for creating a Session ID
+        * Return the dictionary representation of the `User` \- you must use `to_json()` method from User
+        * You must set the cookie to the response - you must use the value of the environment variable `SESSION_NAME` as cookie name - [tip](/rltoken/3WDlzYbVvdJJAf70IjWK6g "tip")
 
-[3]: http://redis.io/topics/cluster-spec
+In the file `api/v1/views/__init__.py`, you must add this new view at the end of the file.
 
-Anatomy of a Redis command
----
+In the first terminal:
+```
+    bob@dylan:~$ API_HOST=0.0.0.0 API_PORT=5000 AUTH_TYPE=session_auth SESSION_NAME=_my_session_id python3 -m api.v1.app
+     * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+    ....
+```
 
-All the Redis commands are defined in the following way:
-
-    void foobarCommand(client *c) {
-        printf("%s",c->argv[1]->ptr); /* Do something with the argument. */
-        addReply(c,shared.ok); /* Reply something to the client. */
+In a second terminal:
+```
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XGET
+    <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+    <title>405 Method Not Allowed</title>
+    <h1>Method Not Allowed</h1>
+    <p>The method is not allowed for the requested URL.</p>
+    bob@dylan:~$
+    bob@dylan:~$  curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST
+    {
+      "error": "email missing"
     }
+    bob@dylan:~$ 
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=guillaume@hbtn.io"
+    {
+      "error": "password missing"
+    }
+    bob@dylan:~$ 
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=guillaume@hbtn.io" -d "password=test"
+    {
+      "error": "no user found for this email"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=bobsession@hbtn.io" -d "password=test"
+    {
+      "error": "wrong password"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=bobsession@hbtn.io" -d "password=fake pwd"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=bobsession@hbtn.io" -d "password=fake pwd" -vvv
+    Note: Unnecessary use of -X or --request, POST is already inferred.
+    *   Trying 0.0.0.0...
+    * TCP_NODELAY set
+    * Connected to 0.0.0.0 (127.0.0.1) port 5000 (#0)
+    > POST /api/v1/auth_session/login HTTP/1.1
+    > Host: 0.0.0.0:5000
+    > User-Agent: curl/7.54.0
+    > Accept: */*
+    > Content-Length: 42
+    > Content-Type: application/x-www-form-urlencoded
+    > 
+    * upload completely sent off: 42 out of 42 bytes
+    * HTTP 1.0, assume close after body
+    < HTTP/1.0 200 OK
+    < Content-Type: application/json
+    < Set-Cookie: _my_session_id=df05b4e1-d117-444c-a0cc-ba0d167889c4; Path=/
+    < Access-Control-Allow-Origin: *
+    < Content-Length: 210
+    < Server: Werkzeug/0.12.1 Python/3.4.3
+    < Date: Mon, 16 Oct 2017 04:57:08 GMT
+    < 
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    * Closing connection 0
+    bob@dylan:~$ 
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=df05b4e1-d117-444c-a0cc-ba0d167889c4"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$
+```
 
-The command is then referenced inside `server.c` in the command table:
+Now you have an authentication based on a Session ID stored in cookie, perfect for a website (browsers love cookies).
 
-    {"foobar",foobarCommand,2,"rtF",0,NULL,0,0,0,0,0},
+### :wrench: Task setup.
+```bash
+```
 
-In the above example `2` is the number of arguments the command takes,
-while `"rtF"` are the command flags, as documented in the command table
-top comment inside `server.c`.
+### :heavy_check_mark: Solution
+> [:point_right: api/v1/views/session_auth.py](api/v1/views/session_auth.py), [:point_right: api/v1/views/__init__.py](api/v1/views/__init__.py)
+<!---->
 
-After the command operates in some way, it returns a reply to the client,
-usually using `addReply()` or a similar function defined inside `networking.c`.
 
-There are tons of command implementations inside the Redis source code
-that can serve as examples of actual commands implementations. Writing
-a few toy commands can be a good exercise to get familiar with the code base.
+<!---->
+## [8. Logout](api/v1/auth/session_auth.py)
+### :page_with_curl: Task requirements.
+Score: 0.0% (Checks completed: 0.0%)
 
-There are also many other files not described here, but it is useless to
-cover everything. We just want to help you with the first steps.
-Eventually you'll find your way inside the Redis code base :-)
+Update the class `SessionAuth` by adding a new method `def destroy_session(self, request=None):` that deletes the user session / logout:
 
-Enjoy!
+* If the `request` is equal to `None`, return `False`
+* If the `request` doesn’t contain the Session ID cookie, return `False` \- you must use `self.session_cookie(request)`
+* If the Session ID of the request is not linked to any User ID, return `False` \- you must use `self.user_id_for_session_id(...)`
+* Otherwise, delete in `self.user_id_by_session_id` the Session ID (as key of this dictionary) and return `True`
+
+Update the file `api/v1/views/session_auth.py`, by adding a new route `DELETE /api/v1/auth_session/logout`:
+
+* Slash tolerant
+* You must use `from api.v1.app import auth`
+* You must use `auth.destroy_session(request)` for deleting the Session ID contains in the request as cookie:
+    * If `destroy_session` returns `False`, `abort(404)`
+    * Otherwise, return an empty JSON dictionary with the status code 200
+
+In the first terminal:
+```
+    bob@dylan:~$ API_HOST=0.0.0.0 API_PORT=5000 AUTH_TYPE=session_auth SESSION_NAME=_my_session_id python3 -m api.v1.app
+     * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+    ....
+```
+
+In a second terminal:
+```
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=bobsession@hbtn.io" -d "password=fake pwd" -vvv
+    Note: Unnecessary use of -X or --request, POST is already inferred.
+    *   Trying 0.0.0.0...
+    * TCP_NODELAY set
+    * Connected to 0.0.0.0 (127.0.0.1) port 5000 (#0)
+    > POST /api/v1/auth_session/login HTTP/1.1
+    > Host: 0.0.0.0:5000
+    > User-Agent: curl/7.54.0
+    > Accept: */*
+    > Content-Length: 42
+    > Content-Type: application/x-www-form-urlencoded
+    > 
+    * upload completely sent off: 42 out of 42 bytes
+    * HTTP 1.0, assume close after body
+    < HTTP/1.0 200 OK
+    < Content-Type: application/json
+    < Set-Cookie: _my_session_id=e173cb79-d3fc-4e3a-9e6f-bcd345b24721; Path=/
+    < Access-Control-Allow-Origin: *
+    < Content-Length: 210
+    < Server: Werkzeug/0.12.1 Python/3.4.3
+    < Date: Mon, 16 Oct 2017 04:57:08 GMT
+    < 
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    * Closing connection 0
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=e173cb79-d3fc-4e3a-9e6f-bcd345b24721"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/logout" --cookie "_my_session_id=e173cb79-d3fc-4e3a-9e6f-bcd345b24721"
+    <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+    <title>405 Method Not Allowed</title>
+    <h1>Method Not Allowed</h1>
+    <p>The method is not allowed for the requested URL.</p>
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/logout" --cookie "_my_session_id=e173cb79-d3fc-4e3a-9e6f-bcd345b24721" -XDELETE
+    {}
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=e173cb79-d3fc-4e3a-9e6f-bcd345b24721"
+    {
+      "error": "Forbidden"
+    }
+    bob@dylan:~$
+```
+
+Login, logout… what’s else?
+
+Now, after getting a Session ID, you can request all protected API routes by using this Session ID, no need anymore to send User email and password every time.
+
+### :wrench: Task setup.
+```bash
+```
+
+### :heavy_check_mark: Solution
+> [:point_right: api/v1/app.py](api/v1/app.py), [:point_right: api/v1/auth/basic_auth.py](api/v1/auth/basic_auth.py)
+<!---->
+
+
+<!---->
+## [9. Expiration?](api/v1/auth/session_exp_auth.py)
+### :page_with_curl: Task requirements.
+Score: 0.0% (Checks completed: 0.0%)
+
+Actually you have 2 authentication systems:
+
+* Basic authentication
+* Session authentication
+
+Now you will add an expiration date to a Session ID.
+
+Create a class `SessionExpAuth` that inherits from `SessionAuth` in the file `api/v1/auth/session_exp_auth.py`:
+
+* Overload `def __init__(self):` method:
+    * Assign an instance attribute `session_duration`:
+        * To the environment variable `SESSION_DURATION` casts to an integer
+        * If this environment variable doesn’t exist or can’t be parse to an integer, assign to 0
+* Overload `def create_session(self, user_id=None):`
+    * Create a Session ID by calling `super()` \- `super()` will call the `create_session()` method of `SessionAuth`
+    * Return `None` if `super()` can’t create a Session ID
+    * Use this Session ID as key of the dictionary `user_id_by_session_id` \- the value for this key must be a dictionary (called “session dictionary”):
+        * The key `user_id` must be set to the variable `user_id`
+        * The key `created_at` must be set to the current datetime - you must use `datetime.now()`
+    * Return the Session ID created
+* Overload `def user_id_for_session_id(self, session_id=None):`
+    * Return `None` if `session_id` is `None`
+    * Return `None` if `user_id_by_session_id` doesn’t contain any key equals to `session_id`
+    * Return the `user_id` key from the session dictionary if `self.session_duration` is equal or under 0
+    * Return `None` if session dictionary doesn’t contain a key `created_at`
+    * Return `None` if the `created_at` \+ `session_duration` seconds are before the current datetime. [datetime - timedelta](/rltoken/mwc3EnlWLNJ2rvzvgZT8eA "datetime - timedelta")
+    * Otherwise, return `user_id` from the session dictionary
+
+Update `api/v1/app.py` to instantiate auth with `SessionExpAuth` if the environment variable `AUTH_TYPE` is equal to `session_exp_auth`.
+
+In the first terminal:
+```
+    bob@dylan:~$ API_HOST=0.0.0.0 API_PORT=5000 AUTH_TYPE=session_exp_auth SESSION_NAME=_my_session_id SESSION_DURATION=60 python3 -m api.v1.app
+     * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+    ....
+```
+
+In a second terminal:
+```
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=bobsession@hbtn.io" -d "password=fake pwd" -vvv
+    Note: Unnecessary use of -X or --request, POST is already inferred.
+    *   Trying 0.0.0.0...
+    * TCP_NODELAY set
+    * Connected to 0.0.0.0 (127.0.0.1) port 5000 (#0)
+    > POST /api/v1/auth_session/login HTTP/1.1
+    > Host: 0.0.0.0:5000
+    > User-Agent: curl/7.54.0
+    > Accept: */*
+    > Content-Length: 42
+    > Content-Type: application/x-www-form-urlencoded
+    > 
+    * upload completely sent off: 42 out of 42 bytes
+    * HTTP 1.0, assume close after body
+    < HTTP/1.0 200 OK
+    < Content-Type: application/json
+    < Set-Cookie: _my_session_id=eea5d963-8dd2-46f0-9e43-fd05029ae63f; Path=/
+    < Access-Control-Allow-Origin: *
+    < Content-Length: 210
+    < Server: Werkzeug/0.12.1 Python/3.4.3
+    < Date: Mon, 16 Oct 2017 04:57:08 GMT
+    < 
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    * Closing connection 0
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=eea5d963-8dd2-46f0-9e43-fd05029ae63f"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ sleep 10
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=eea5d963-8dd2-46f0-9e43-fd05029ae63f"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$ 
+    bob@dylan:~$ sleep 51 # 10 + 51 > 60
+    bob@dylan:~$ 
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=eea5d963-8dd2-46f0-9e43-fd05029ae63f"
+    {
+      "error": "Forbidden"
+    }
+    bob@dylan:~$
+```
+### :wrench: Task setup.
+```bash
+```
+
+### :heavy_check_mark: Solution
+> [:point_right: api/v1/auth/session_exp_auth.py](api/v1/auth/session_exp_auth.py), [:point_right: api/v1/app.py](api/v1/app.py)
+<!---->
+
+<!---->
+## [10. Sessions in database](api/v1/auth/session_db_auth.py)
+### :page_with_curl: Task requirements.
+Score: 0.0% (Checks completed: 0.0%)
+
+Since the beginning, all Session IDs are stored in memory. It means, if your application stops, all Session IDs are lost.
+
+For avoid that, you will create a new authentication system, based on Session ID stored in database (for us, it will be in a file, like `User`).
+
+Create a new model `UserSession` in `models/user_session.py` that inherits from `Base`:
+
+* Implement the `def __init__(self, *args: list, **kwargs: dict):` like in `User` but for these 2 attributes:
+    * `user_id`: string
+    * `session_id`: string
+
+Create a new authentication class `SessionDBAuth` in `api/v1/auth/session_db_auth.py` that inherits from `SessionExpAuth`:
+
+* Overload `def create_session(self, user_id=None):` that creates and stores new instance of `UserSession` and returns the Session ID
+* Overload `def user_id_for_session_id(self, session_id=None):` that returns the User ID by requesting `UserSession` in the database based on `session_id`
+* Overload `def destroy_session(self, request=None):` that destroys the `UserSession` based on the Session ID from the request cookie
+
+Update `api/v1/app.py` to instantiate `auth` with `SessionDBAuth` if the environment variable `AUTH_TYPE` is equal to `session_db_auth`.
+
+In the first terminal:
+```
+    bob@dylan:~$ API_HOST=0.0.0.0 API_PORT=5000 AUTH_TYPE=session_db_auth SESSION_NAME=_my_session_id SESSION_DURATION=60 python3 -m api.v1.app
+     * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+    ....
+```
+
+In a second terminal:
+```
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/auth_session/login" -XPOST -d "email=bobsession@hbtn.io" -d "password=fake pwd" -vvv
+    Note: Unnecessary use of -X or --request, POST is already inferred.
+    *   Trying 0.0.0.0...
+    * TCP_NODELAY set
+    * Connected to 0.0.0.0 (127.0.0.1) port 5000 (#0)
+    > POST /api/v1/auth_session/login HTTP/1.1
+    > Host: 0.0.0.0:5000
+    > User-Agent: curl/7.54.0
+    > Accept: */*
+    > Content-Length: 42
+    > Content-Type: application/x-www-form-urlencoded
+    > 
+    * upload completely sent off: 42 out of 42 bytes
+    * HTTP 1.0, assume close after body
+    < HTTP/1.0 200 OK
+    < Content-Type: application/json
+    < Set-Cookie: _my_session_id=bacadfad-3c3b-4830-b1b2-3d77dfb9ad13; Path=/
+    < Access-Control-Allow-Origin: *
+    < Content-Length: 210
+    < Server: Werkzeug/0.12.1 Python/3.4.3
+    < Date: Mon, 16 Oct 2017 04:57:08 GMT
+    < 
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    * Closing connection 0
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=bacadfad-3c3b-4830-b1b2-3d77dfb9ad13"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ sleep 10
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=bacadfad-3c3b-4830-b1b2-3d77dfb9ad13"
+    {
+      "created_at": "2017-10-16 04:23:04", 
+      "email": "bobsession@hbtn.io", 
+      "first_name": null, 
+      "id": "cf3ddee1-ff24-49e4-a40b-2540333fe992", 
+      "last_name": null, 
+      "updated_at": "2017-10-16 04:23:04"
+    }
+    bob@dylan:~$
+    bob@dylan:~$ sleep 60
+    bob@dylan:~$
+    bob@dylan:~$ curl "http://0.0.0.0:5000/api/v1/users/me" --cookie "_my_session_id=bacadfad-3c3b-4830-b1b2-3d77dfb9ad13"
+    {
+      "error": "Forbidden"
+    }
+    bob@dylan:~$
+```
+### :wrench: Task setup.
+```bash
+```
+
+### :heavy_check_mark: Solution
+> [:point_right: [:point_right: api/v1/auth/session_db_auth.py](api/v1/auth/session_db_auth.py), [:point_right: api/v1/app.py](api/v1/app.py), [:point_right: models/user_session.py](models/user_session.py)
+<!---->
+
+### :heavy_check_mark: Solution
+> [:point_right: [:point_right: api/v1/auth/basic_auth.py](api/v1/auth/basic_auth.py)
+<!---->
+
+# :man: Author and Credits.
+This project was done by [SE. Moses Mwangi](https://github.com/MosesSoftEng). Feel free to get intouch with me;
+
+:iphone: WhatsApp [+254115227963](https://wa.me/254115227963)
+
+:email: Email [moses.soft.eng@gmail.com](mailto:moses.soft.eng@gmail.com)
+
+:thumbsup: A lot of thanks to [ALX-Africa Software Engineering](https://www.alxafrica.com/) program for the project requirements.
